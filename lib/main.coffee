@@ -77,7 +77,14 @@ module.exports = MarkdownImageAssistant =
                     origname = path.basename(f.path, extname)
                 else
                     origname = ""
-                @process_file(editor, imgbuffer, extname, origname)
+                relpath = ""
+                editpath = editor.getPath()
+                if path.parse(editpath).root == path.parse(f.path).root
+                    relpath = path.relative(path.dirname(editpath), f.path)
+                    relpath = "" if (relpath.substr(0,2) == "..")
+                if relpath !="" && path.sep != "/"
+                    relpath = relpath.split(path.sep).join("/")
+                @process_file(editor, imgbuffer, extname, origname, relpath)
 
     # triggered in response to a copy pasted image
     handle_cp: (e) ->
@@ -87,14 +94,21 @@ module.exports = MarkdownImageAssistant =
         editor = atom.workspace.getActiveTextEditor()
         e.stopImmediatePropagation()
         imgbuffer = img.toPng()
-        @process_file(editor, imgbuffer, ".png", "")
+        @process_file(editor, imgbuffer, ".png", "", "")
 
     # write a given buffer to the local "assets/" directory
-    process_file: (editor, imgbuffer, extname, origname) ->
+    process_file: (editor, imgbuffer, extname, origname, relpath) ->
         target_file = editor.getPath()
 
         if path.extname(target_file) not in atom.config.get('markdown-image-assistant.suffixes')
             console.log "Adding images to non-markdown files is not supported"
+            return false
+
+        if (relpath != "") 
+            if atom.config.get('markdown-image-assistant.insertHtmlOverMarkdown')
+                editor.insertText "<img alt=\"#{relpath}\" src=\"#{relpath}\" width=\"\" height=\"\" >"
+            else
+                editor.insertText "![](#{relpath})"
             return false
 
         if atom.config.get('markdown-image-assistant.imageDir') == defaultImageDir && atom.config.get('markdown-image-assistant.preserveFileNameInAssetsFolder')
